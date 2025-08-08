@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Private Meet</title>
+  <style>
+    body {
+      background-color: #8e44ad;
+      color: white;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      text-align: center;
+      margin: 0; padding: 0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+    #lobby, #call {
+      width: 100%;
+      max-width: 600px;
+    }
+    #lobby {
+      padding: 40px;
+    }
+    input, button {
+      padding: 10px;
+      margin: 10px;
+      font-size: 18px;
+      border-radius: 12px;
+      border: none;
+      outline: none;
+    }
+    input {
+      width: 250px;
+    }
+    button {
+      background-color: #c39bd3;
+      color: #4a235a;
+      font-weight: bold;
+      border-radius: 15px;
+      padding: 12px 25px;
+      margin: 15px 7px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+      display: inline-block;
+    }
+    button:hover {
+      background-color: #a569bd;
+      color: white;
+    }
+    #message {
+      color: #e0bbf7;
+      font-weight: 700;
+      font-size: 18px;
+      min-height: 24px;
+    }
+    #call {
+      display: none;
+      height: 100vh;
+      position: relative;
+      background: black;
+      color: white;
+      overflow: hidden;
+    }
+    video {
+      width: 100%;
+      height: 100vh;
+      object-fit: cover;
+      background: black;
+    }
+    #controls {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 20px;
+    }
+    .control-btn {
+      background: #6a0dadcc;
+      border: none;
+      border-radius: 12px;
+      padding: 10px 20px;
+      color: white;
+      font-size: 18px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      user-select: none;
+      transition: background-color 0.3s ease;
+    }
+    .control-btn:hover {
+      background-color: #8e44ad;
+    }
+    /* Fixed chat CSS to allow open/close toggling */
+    #chat {
+      position: fixed;
+      right: 0;
+      top: 0;
+      bottom: 0;
+      width: 280px;
+      background: #4a235a;
+      color: white;
+      display: flex;
+      flex-direction: column;
+      transform: translateX(100%);
+      transition: transform 0.3s ease;
+      z-index: 1000;
+    }
+    #chat.open {
+      transform: translateX(0);
+    }
+    #chat-header {
+      padding: 15px;
+      background: #6a0dad;
+      font-weight: bold;
+      text-align: center;
+    }
+    #chat-messages {
+      flex-grow: 1;
+      padding: 15px;
+      overflow-y: auto;
+      font-size: 14px;
+    }
+    #chat-input {
+      border: none;
+      padding: 10px;
+      font-size: 16px;
+      border-radius: 0 0 12px 12px;
+      outline: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="lobby">
+    <h1>Welcome to Your Private Meet</h1>
+    <input id="nameInput" type="text" placeholder="Enter your name" /><br />
+    <button id="startBtn">Start Meeting</button>
+    <button id="joinBtn">Join Meeting</button>
+    <p id="message"></p>
+  </div>
+
+  <div id="call">
+    <video id="localVideo" autoplay muted playsinline></video>
+    <div id="controls">
+      <button class="control-btn" id="micBtn">🎤 Mute</button>
+      <button class="control-btn" id="camBtn">📷 Camera On</button>
+      <button class="control-btn" id="chatToggleBtn">💬 Chat</button>
+    </div>
+    <div id="chat">
+      <div id="chat-header">Chat</div>
+      <div id="chat-messages"></div>
+      <input id="chat-input" placeholder="Type a message..." />
+    </div>
+  </div>
+
+<script>
+  let savedPassword = '';
+  let meetingStarted = false;
+  let micOn = true;
+  let camOn = true;
+
+  const lobby = document.getElementById('lobby');
+  const call = document.getElementById('call');
+  const messageEl = document.getElementById('message');
+  const localVideo = document.getElementById('localVideo');
+  const micBtn = document.getElementById('micBtn');
+  const camBtn = document.getElementById('camBtn');
+  const chatToggleBtn = document.getElementById('chatToggleBtn');
+  const chat = document.getElementById('chat');
+  const chatMessages = document.getElementById('chat-messages');
+  const chatInput = document.getElementById('chat-input');
+
+  let localStream = null;
+
+  function startMeeting() {
+    const name = document.getElementById('nameInput').value.trim();
+    if (!name) {
+      messageEl.textContent = "Please enter your name to start the meeting!";
+      return;
+    }
+    if (meetingStarted) {
+      messageEl.textContent = "Meeting already started.";
+      return;
+    }
+    const password = prompt('Set a password for this meeting:');
+    if (!password) {
+      messageEl.textContent = "Password required.";
+      return;
+    }
+    savedPassword = password;
+    meetingStarted = true;
+    messageEl.textContent = `Meeting started by ${name}. Share the password to join!`;
+    showCall();
+  }
+
+  function joinMeeting() {
+    const name = document.getElementById('nameInput').value.trim();
+    if (!name) {
+      messageEl.textContent = "Please enter your name to join a meeting!";
+      return;
+    }
+    if (!meetingStarted) {
+      messageEl.textContent = "No meeting started yet.";
+      return;
+    }
+    const enteredPassword = prompt('Enter the meeting password:');
+    if (enteredPassword === savedPassword) {
+      messageEl.textContent = `Welcome, ${name}! Joining meeting...`;
+      showCall();
+    } else {
+      messageEl.textContent = "Incorrect password. Access denied.";
+    }
+  }
+
+  function showCall() {
+    lobby.style.display = 'none';
+    call.style.display = 'block';
+    startVideo();
+  }
+
+  async function startVideo() {
+    try {
+      localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      localVideo.srcObject = localStream;
+    } catch (err) {
+      messageEl.textContent = 'Could not access camera and microphone.';
+    }
+  }
+
+  micBtn.onclick = () => {
+    if (!localStream) return;
+    const audioTracks = localStream.getAudioTracks();
+    if (audioTracks.length === 0) return;
+    micOn = !micOn;
+    audioTracks[0].enabled = micOn;
+    micBtn.textContent = micOn ? '🎤 Mute' : '🔇 Muted';
+  };
+
+  camBtn.onclick = () => {
+    if (!localStream) return;
+    const videoTracks = localStream.getVideoTracks();
+    if (videoTracks.length === 0) return;
+    camOn = !camOn;
+    videoTracks[0].enabled = camOn;
+    camBtn.textContent = camOn ? '📷 Camera On' : '📷 Camera Off';
+  };
+
+  chatToggleBtn.onclick = () => {
+    chat.classList.toggle('open');
+  };
+
+  chatInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && chatInput.value.trim()) {
+      const msg = document.createElement('div');
+      msg.textContent = `You: ${chatInput.value.trim()}`;
+      chatMessages.appendChild(msg);
+      chatInput.value = '';
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+  });
+
+  document.getElementById('startBtn').onclick = startMeeting;
+  document.getElementById('joinBtn').onclick = joinMeeting;
+</script>
+
+</body>
+</html>
